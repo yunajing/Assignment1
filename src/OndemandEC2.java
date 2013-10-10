@@ -109,14 +109,18 @@ public class OndemandEC2 {
         ec2.createTags(ctr);
         
         //Wait for the new machine to run
-        try{
+        while(state.getName().equalsIgnoreCase("pending")){
+        	try{
         		
-        		Thread.sleep(40000);
-        	}
-        	catch (InterruptedException e){
-        		e.printStackTrace();
-        	}
-        state = ins.getState();
+        		Thread.sleep(20000);
+        		System.out.println(state.getName());
+        		}
+        		catch (InterruptedException e){
+        			e.printStackTrace();
+        		}	
+        	state = this.getInstance().getState();
+        }
+        //state = ins.getState();
 		//System.out.println(state.getName());
         
         if (this.ipAddress == null){

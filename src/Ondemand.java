@@ -92,8 +92,8 @@ public class Ondemand {
         AmazonEC2 ec2 = new AmazonEC2Client(credentials);
         AmazonS3Client s3 = new AmazonS3Client(credentials);
         AmazonCloudWatchClient cloudWatch = new AmazonCloudWatchClient(credentials);
-           String counter = "1";
-    	   String securitygroup = "assigment" + counter;
+           String counter = "3";
+    	   String securitygroup = "assigment1-" + counter;
     	   String keypair = "workkey" + counter;
     	   String zone = "us-east-1a";
     	   String bucketname = "assign1bucket" + counter;
@@ -127,12 +127,12 @@ public class Ondemand {
     			   
     			   System.out.println("Now all machines are created.\r\nPlease wait for initialization.");
     			   
-    			   if (days <=1){
+    			   //if (days <=1){
     				   Thread.sleep(2*60*1000);
     				   System.out.println("Start working now.");
     				   increaseCPU(worker1, keypair);  //ssh initialization, start working
     				   increaseCPU(worker2, keypair);
-    			   }		   
+    			 //  }		   
     			   
     			   sleep(cloudwatchtime); 
     			   
@@ -331,12 +331,16 @@ public class Ondemand {
 		
 		System.out.println("Detach the EBS volume " +machine.volumeID);
 		machine.detachVolume();
-		System.out.println("Save Snapshot");
+		System.out.println("Save Snapshot, please wait for available...");
 		machine.saveSnapShot();
-		System.out.println("Terminate the machine");
+		while(!machine.getSnapShotState().equalsIgnoreCase("available"))
+		{
+			System.out.println("AMI Status is " +machine.getSnapShotState());
+			sleep(10); //Wait for AMI available
+		}
+		System.out.println("AMI is available now.\r\nTerminate the machine");
 		machine.shutDown();
 
-		
 	}
 	
 	static void increaseCPU(OndemandEC2 worker, String keypair) throws InterruptedException {
@@ -424,6 +428,7 @@ public class Ondemand {
 			//Use one of these strings: Average, Maximum, Minimum, SampleCount, Sum 
 			stats.add("Average"); 
 			stats.add("Sum");
+			stats.add("Maximum");
 			statRequest.setStatistics(stats);
 			
 			//Use one of these strings: CPUUtilization, NetworkIn, NetworkOut, DiskReadBytes, DiskWriteBytes, DiskReadOperations  
@@ -451,9 +456,11 @@ public class Ondemand {
 			//System.out.println(statResult.toString());
 			List<Datapoint> dataList = statResult.getDatapoints();
 			Double averageCPU = null;
+			Double maxCPU = null;
 			Date timeStamp = null;
 			for (Datapoint data : dataList){
 				averageCPU = data.getAverage();
+				maxCPU = data.getMaximum();
 				timeStamp = data.getTimestamp();
 				//System.out.println("Average CPU utililization for last 10 minutes: "+averageCPU);
 				//System.out.println("Total CPU utililization for last 10 minutes: "+data.getSum());
@@ -464,7 +471,7 @@ public class Ondemand {
             	return 0;
             }
             else{
-            	System.out.println(instanceID + " : average CPU utlilization for last hour is "+averageCPU);
+            	System.out.println(instanceID + " : average CPU utlilization for last hour is "+ maxCPU);
             	return averageCPU;
             }
             
