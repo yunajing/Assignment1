@@ -113,15 +113,13 @@ public class OndemandEC2 {
         	try{
         		
         		Thread.sleep(20000);
-        		System.out.println(state.getName());
+        		//System.out.println(state.getName());
         		}
         		catch (InterruptedException e){
         			e.printStackTrace();
         		}	
         	state = this.getInstance().getState();
         }
-        //state = ins.getState();
-		//System.out.println(state.getName());
         
         if (this.ipAddress == null){
         	this.createElasticIp();
@@ -131,6 +129,7 @@ public class OndemandEC2 {
         
         isTerminated = false;
         System.out.println("Instance created: " + machinename + " with ID = " + this.instanceID + " IP = " + this.ipAddress + " and AMI = " + this.imageID);
+        System.out.println("PublicDNS = "+this.getInstance().getPublicDnsName());
     }
     
     public Instance getInstance(){
@@ -142,7 +141,6 @@ public class OndemandEC2 {
         for (Reservation reservation : reservations) {
         	instances.addAll(reservation.getInstances());
         }
-        
                 
         for ( Instance ins : instances){
            	if ( instanceID.equalsIgnoreCase(ins.getInstanceId()) == true ){

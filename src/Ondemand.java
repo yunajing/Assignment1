@@ -64,14 +64,14 @@ import com.amazonaws.services.s3.model.PutObjectRequest;
 public class Ondemand {
 	
 	//Time to get statistics from cloud watch
-	public static int cloudwatchtime = 60;
+	public static int cloudwatchtime = 20;
 	//Maximum days for a VM to exist
 	public static int maxDays = 2;
 	//Night and day duration in seconds
-	public static int nightTime = 5*60;
-	public static int dayTime = 4*60;
+	public static int nightTime = 5*30;
+	public static int dayTime = 6*60;
 	//Threshold of a computer being idle
-	public static double cpuIdle = 0.0;
+	public static double cpuIdle = 0.00;
 	/*
 	 * private key storage path
 	 */
@@ -92,8 +92,9 @@ public class Ondemand {
         AmazonEC2 ec2 = new AmazonEC2Client(credentials);
         AmazonS3Client s3 = new AmazonS3Client(credentials);
         AmazonCloudWatchClient cloudWatch = new AmazonCloudWatchClient(credentials);
-           String counter = "3";
-    	   String securitygroup = "assigment1-" + counter;
+        
+           String counter = "7";
+    	   String securitygroup = "assignment1-" + counter;
     	   String keypair = "workkey" + counter;
     	   String zone = "us-east-1a";
     	   String bucketname = "assign1bucket" + counter;
@@ -106,9 +107,6 @@ public class Ondemand {
     	   
     	   OndemandEC2 worker1 = new OndemandEC2(securitygroup,keypair,imageID,zone,"worker1");
     	   OndemandEC2 worker2 = new OndemandEC2(securitygroup,keypair,imageID,zone,"worker2");
-           
-    	   //For auto scaling
-    	   OndemandEC2 worker3 = new OndemandEC2(securitygroup,keypair,imageID, zone, "worker3");
     	   
     	   List<OndemandEC2> machines = Arrays.asList(worker1,worker2);
     	   
@@ -128,10 +126,11 @@ public class Ondemand {
     			   System.out.println("Now all machines are created.\r\nPlease wait for initialization.");
     			   
     			   //if (days <=1){
+    			   	   
     				   Thread.sleep(2*60*1000);
     				   System.out.println("Start working now.");
-    				   increaseCPU(worker1, keypair);  //ssh initialization, start working
-    				   increaseCPU(worker2, keypair);
+    				   //increaseCPU(worker1, keypair);  //ssh initialization, start working
+    				   //increaseCPU(worker2, keypair);
     			 //  }		   
     			   
     			   sleep(cloudwatchtime); 
@@ -143,45 +142,39 @@ public class Ondemand {
     			   days++;
     			   
     			   //Time to end, terminate all machines
-    			   
+    			   System.out.println("End of Daytime. Terminate all machines.\r\nNighttime begins.");
     			   for (OndemandEC2 machine : machines){
     				   closeMachine(machine);
     			   }
-    			   //Worker for auto-scale, not included in the list
-    			   if (!worker3.getIsTerminated(false))
-    				   worker3.shutDown();
     			   
     			   if (days>maxDays){
     				   System.out.println("Reach the maximum day of working!");
     				   break;
     			   }
-    			   System.out.println("End of Daytime. All machines are terminiated.\r\nNighttime begins.");
+    			   
     			   sleep(nightTime);
     			   continue;
     		   }
     		   
     		   count++;
-    		   
-    		   if ((days == 1)&&(count>3)){
-    			   if (worker1.getIsTerminated(false))
+    		   /*
+    		   if ((days == 1)&&(count>3)){ 
+    			   if (!worker1.getIsTerminated(false))
     			   releaseCPU(worker1, keypair);
-    			   if (worker2.getIsTerminated(false))
+    			   if (!worker2.getIsTerminated(false))
     			   releaseCPU(worker2, keypair);
-    		   }
+    		   } */
+    		   //sleep(cloudwatchtime);
     		   
     		   //Terminate idle machines
     		   for(OndemandEC2 machine : machines){
     			   if(isIdle(cloudWatch, machine, cpuIdle)){
-    				   
-    				   System.out.println(machine.machinename + " is idle, terminate it.");  
-    				   closeMachine(machine);
-    				     				   
-    			   }   
-    		   }
-    		   //Auto-scale
-    		   autoScale(worker3, cpuUtil(cloudWatch, worker2.instanceID));
-    		   
-    		   System.out.println("Hours running: " + count);
+    					   System.out.println(machine.machinename + " is idle, terminate it.");  
+    					   closeMachine(machine);
+    				   }   				   
+    			   }   	   
+    		   int count3= count-1;
+    		   System.out.println("Hours of running: " + count3);
     		   
     		   sleep(cloudwatchtime);
     	   }
@@ -346,23 +339,22 @@ public class Ondemand {
 	static void increaseCPU(OndemandEC2 worker, String keypair) throws InterruptedException {
 		
 		File file = new File(keypair + ".pem");
-		//String filePass = "none";
 		
 		try{
 			Connection connection = new Connection(worker.ipAddress);
 			connection.connect();
 			
 			boolean auth = connection.authenticateWithPublicKey("ec2-user", file, "none");
+			if (auth == true)
+				System.out.println("Successfully log in. \r\nIncrease CPU of "+worker.machinename);
 			if (auth == false)
 				throw new IOException("Authentification failed");
 			
-			Session session = connection.openSession();
-			System.out.println("Increase CPU of "+worker.machinename);
+			Session session = connection.openSession();	
 			session.execCommand("while true; do true; done");
 			session.close();
 			connection.close();
 			
-			//System.out.println("Increase CPU of "+worker.machinename);
 		}
 		catch (IOException e){
 			e.printStackTrace(System.err);
@@ -383,10 +375,11 @@ public class Ondemand {
 				throw new IOException("Authentification failed");
 			
 			Session session = connection.openSession();
-			session.execCommand("killall bash");
+			System.out.println("Release CPU of "+ session.toString());
+			session.execCommand("kill -9 -1");
 			session.close();
 			connection.close();
-			System.out.println("Release CPU of "+ worker.machinename);
+			
 		}
 		catch (IOException e){
 			e.printStackTrace(System.err);
@@ -407,13 +400,13 @@ public class Ondemand {
 		
 		if (machine.getIsTerminated(true))
 			return false;
-		double utilization = cpuUtil(cloudWatch, machine.instanceID);
+		double utilization = cpuUtil(cloudWatch, machine.machinename, machine.instanceID);
 		if (utilization < 0) 
 			return false;
 		return utilization <= cpuIdle;  
 	}
 
-	public static double cpuUtil(AmazonCloudWatchClient cloudWatch, String instanceID){
+	public static double cpuUtil(AmazonCloudWatchClient cloudWatch, String machinename, String instanceID){
 
 		try{
 			
@@ -428,7 +421,6 @@ public class Ondemand {
 			//Use one of these strings: Average, Maximum, Minimum, SampleCount, Sum 
 			stats.add("Average"); 
 			stats.add("Sum");
-			stats.add("Maximum");
 			statRequest.setStatistics(stats);
 			
 			//Use one of these strings: CPUUtilization, NetworkIn, NetworkOut, DiskReadBytes, DiskWriteBytes, DiskReadOperations  
@@ -438,14 +430,14 @@ public class Ondemand {
 			GregorianCalendar calendar = new GregorianCalendar(TimeZone.getTimeZone("UTC"));
 			calendar.add(GregorianCalendar.SECOND, -1 * calendar.get(GregorianCalendar.SECOND)); // 1 second ago
 			Date endTime = calendar.getTime();
-			calendar.add(GregorianCalendar.MINUTE, -1); // 1 minutes ago
+			calendar.add(GregorianCalendar.MINUTE, -10); // 1 minutes ago
 			Date startTime = calendar.getTime();
 			statRequest.setStartTime(startTime);
 			statRequest.setEndTime(endTime);
 			
 			//specify an instance
 			ArrayList<Dimension> dimensions = new ArrayList<Dimension>();
-			dimensions.add(new Dimension().withName("InstanceID").withValue(instanceID));
+			dimensions.add(new Dimension().withName("InstanceId").withValue(instanceID));
 			statRequest.setDimensions(dimensions);
 			//System.out.println(dimensions);
 			
@@ -456,22 +448,20 @@ public class Ondemand {
 			//System.out.println(statResult.toString());
 			List<Datapoint> dataList = statResult.getDatapoints();
 			Double averageCPU = null;
-			Double maxCPU = null;
 			Date timeStamp = null;
 			for (Datapoint data : dataList){
 				averageCPU = data.getAverage();
-				maxCPU = data.getMaximum();
 				timeStamp = data.getTimestamp();
 				//System.out.println("Average CPU utililization for last 10 minutes: "+averageCPU);
 				//System.out.println("Total CPU utililization for last 10 minutes: "+data.getSum());
 			}
             
             if (averageCPU == null) {
-            	System.out.println(instanceID + " : average CPU utlilization for last hour is 0");
+            	System.out.println(machinename + " : average CPU utlilization for last hour is 0");
             	return 0;
             }
             else{
-            	System.out.println(instanceID + " : average CPU utlilization for last hour is "+ maxCPU);
+            	System.out.println( machinename + " : average CPU utlilization for last hour is "+ averageCPU);
             	return averageCPU;
             }
             
@@ -481,20 +471,6 @@ public class Ondemand {
 		    System.out.println("Error Code: " + ase.getErrorCode());
 		    System.out.println("Request ID: " + ase.getRequestId());
 		    return 0;
-		}
-	}
-	
-	public static void autoScale(OndemandEC2 worker3, double value){
-		
-		Boolean terminate = worker3.getIsTerminated(false);
-		
-		if (worker3.getIsTerminated(false)&& value>upperTh){
-			System.out.println("CPU utilization exceeds threshold, create one more machine.");
-			worker3.createInstane();		
-		}
-		else if (!terminate && value<lowerTh){
-			System.out.println("CPU utilization below threshold, close one machine.");
-			worker3.shutDown();
 		}
 	}
 }
