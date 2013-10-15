@@ -69,9 +69,9 @@ public class Ondemand {
 	public static int maxDays = 2;
 	//Night and day duration in seconds
 	public static int nightTime = 5*30;
-	public static int dayTime = 6*60;
+	public static int dayTime = 8*60;
 	//Threshold of a computer being idle
-	public static double cpuIdle = 0.00;
+	public static double cpuIdle = 0.00; 
 	/*
 	 * private key storage path
 	 */
@@ -93,7 +93,7 @@ public class Ondemand {
         AmazonS3Client s3 = new AmazonS3Client(credentials);
         AmazonCloudWatchClient cloudWatch = new AmazonCloudWatchClient(credentials);
         
-           String counter = "7";
+           String counter = "1";
     	   String securitygroup = "assignment1-" + counter;
     	   String keypair = "workkey" + counter;
     	   String zone = "us-east-1a";
@@ -129,11 +129,11 @@ public class Ondemand {
     			   	   
     				   Thread.sleep(2*60*1000);
     				   System.out.println("Start working now.");
-    				   //increaseCPU(worker1, keypair);  //ssh initialization, start working
-    				   //increaseCPU(worker2, keypair);
+    				   increaseCPU(worker1, keypair);  //ssh initialization, start working
+    				   increaseCPU(worker2, keypair);
     			 //  }		   
     			   
-    			   sleep(cloudwatchtime); 
+    			   sleep(cloudwatchtime*2); 
     			   
     			   continue;  
     		   }
@@ -157,14 +157,13 @@ public class Ondemand {
     		   }
     		   
     		   count++;
-    		   /*
-    		   if ((days == 1)&&(count>3)){ 
+    		   
+    		   if (count == 8){ 
     			   if (!worker1.getIsTerminated(false))
     			   releaseCPU(worker1, keypair);
     			   if (!worker2.getIsTerminated(false))
     			   releaseCPU(worker2, keypair);
-    		   } */
-    		   //sleep(cloudwatchtime);
+    		   } 
     		   
     		   //Terminate idle machines
     		   for(OndemandEC2 machine : machines){
@@ -326,11 +325,11 @@ public class Ondemand {
 		machine.detachVolume();
 		System.out.println("Save Snapshot, please wait for available...");
 		machine.saveSnapShot();
-		while(!machine.getSnapShotState().equalsIgnoreCase("available"))
-		{
-			System.out.println("AMI Status is " +machine.getSnapShotState());
+		do {
 			sleep(10); //Wait for AMI available
-		}
+			System.out.println("AMI Status is " +machine.getSnapShotState());
+		}while(!machine.getSnapShotState().equalsIgnoreCase("available"));
+		
 		System.out.println("AMI is available now.\r\nTerminate the machine");
 		machine.shutDown();
 
@@ -375,8 +374,8 @@ public class Ondemand {
 				throw new IOException("Authentification failed");
 			
 			Session session = connection.openSession();
-			System.out.println("Release CPU of "+ session.toString());
-			session.execCommand("kill -9 -1");
+			System.out.println("Release CPU of "+ worker.machinename);
+			session.execCommand("killall bash");
 			session.close();
 			connection.close();
 			
@@ -430,7 +429,7 @@ public class Ondemand {
 			GregorianCalendar calendar = new GregorianCalendar(TimeZone.getTimeZone("UTC"));
 			calendar.add(GregorianCalendar.SECOND, -1 * calendar.get(GregorianCalendar.SECOND)); // 1 second ago
 			Date endTime = calendar.getTime();
-			calendar.add(GregorianCalendar.MINUTE, -10); // 1 minutes ago
+			calendar.add(GregorianCalendar.MINUTE, -5); // 5 minutes ago
 			Date startTime = calendar.getTime();
 			statRequest.setStartTime(startTime);
 			statRequest.setEndTime(endTime);
